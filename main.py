@@ -169,10 +169,51 @@ def uncompress( inputFile, outputFile ):
   # ---------------- [YOUR CODE HERE] ----------------
   #
   # REPLACE THIS WITH YOUR OWN CODE TO CONVERT THE 'inputBytes' ARRAY INTO AN IMAGE IN 'img'.
- 
+  
+  # We essentially just need to reverse the process that we completed in the compress function
 
+  # First LZW decompression of the input bytes
+  potential_values = [str(i) for i in range(-256,256)]
+  lzw_decompression_dict = {index: value for index, value in enumerate(potential_values)}
+  output_differences = []
+  input_index = 0
+
+  while input_index < len(inputBytes):
+    current_code = struct.unpack(">H", inputBytes[input_index:input_index + 2])[0]
+    current_str = lzw_decompression_dict[current_code]
+
+    # update the dictionary
+    if len(output_differences) > 0:
+      last_str = output_differences[-1]
+      next_key = len(lzw_decompression_dict)
+      if next_key < 65536:
+        lzw_decompression_dict[next_key] = last_str + "|" + current_str.split("|", 1)[0]
+
+    # extend output differences
+    output_differences.extend(current_str.split("|"))
+
+    # update the input index
+    input_index += 2
+
+
+  # Predictive Decoding
+  if numChannels == 1:
+    img = np.zeros((rows, columns), dtype=np.uint8)
+  else:
+    img = np.zeros((rows, columns, numChannels), dtype=np.uint8)
+  
+  for index, diff in enumerate(map(int, output_differences)):
+    row, col, channel = index % rows, (index // rows) % columns, index // (rows * columns)
+
+    if row == 0:
+      img[row, col, channel] = diff
+    else:
+      img[row, col, channel] = diff + img[row - 1, col, channel]
+  
+  
 
   # ---------------- [END OF YOUR CODE] ----------------
+  
 
   endTime = time.time()
   sys.stderr.write( 'Uncompression time %.2f seconds\n' % (endTime - startTime) )
